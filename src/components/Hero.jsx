@@ -21,12 +21,14 @@ const Hero = () => {
   useEffect(() => {
     let loadedCount = 0;
     const imgArray = [];
+    const frameStride = 4; // Aggressive optimization: Load every 4th frame
+    const effectiveTotal = Math.ceil(frameCount / frameStride);
 
     // Function to handle load
     const onLoad = () => {
       loadedCount++;
-      setLoadingProgress(Math.round((loadedCount / frameCount) * 100));
-      if (loadedCount === frameCount) {
+      setLoadingProgress(Math.round((loadedCount / effectiveTotal) * 100));
+      if (loadedCount >= effectiveTotal) {
         setIsLoaded(true);
       }
     };
@@ -35,14 +37,12 @@ const Hero = () => {
     const firstImg = new Image();
     firstImg.src = currentFrame(1);
     firstImg.onload = () => {
-      // Initial render logic will handle this
-      // We still count it
       onLoad();
     };
-    imgArray[0] = firstImg; // Store at index 0 (frame 1)
+    imgArray[0] = firstImg;
 
-    // 2. Load the rest in background
-    for (let i = 2; i <= frameCount; i++) {
+    // 2. Load the rest in background with stride
+    for (let i = 1 + frameStride; i <= frameCount; i += frameStride) {
       const img = new Image();
       img.src = currentFrame(i);
       img.onload = onLoad;
