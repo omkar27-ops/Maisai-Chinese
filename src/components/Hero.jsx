@@ -5,43 +5,61 @@ const Hero = () => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [images, setImages] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   // Configuration
   const frameCount = 192;
-  const imagesPath = '/Noodle Toss'; // Assumes images are in public/Noodle Toss/
+  const imagesPath = '/Noodle Toss Optimized'; // Use optimized images
 
   // Pad numbers with leading zeros (e.g., 1 -> 00001)
   const currentFrame = (index) => (
-    `${imagesPath}/${index.toString().padStart(5, '0')}.png`
+    `${imagesPath}/${index.toString().padStart(5, '0')}.jpg`
   );
 
-  // Preload images
+  // Preload images with progressive loading
   useEffect(() => {
     let loadedCount = 0;
     const imgArray = [];
 
-    // We'll load all frames. For 192 frames, this might take a moment.
-    // In a real prod app, you might lazily load or use a sprite sheet/video.
-    for (let i = 1; i <= frameCount; i++) {
+    // Function to handle load
+    const onLoad = () => {
+      loadedCount++;
+      setLoadingProgress(Math.round((loadedCount / frameCount) * 100));
+      if (loadedCount === frameCount) {
+        setIsLoaded(true);
+      }
+    };
+
+    // 1. Load the first frame immediately
+    const firstImg = new Image();
+    firstImg.src = currentFrame(1);
+    firstImg.onload = () => {
+      // Initial render logic will handle this
+      // We still count it
+      onLoad();
+    };
+    imgArray[0] = firstImg; // Store at index 0 (frame 1)
+
+    // 2. Load the rest in background
+    for (let i = 2; i <= frameCount; i++) {
       const img = new Image();
       img.src = currentFrame(i);
-      img.onload = () => {
-        loadedCount++;
-        if (loadedCount === frameCount) {
-          setLoading(false);
-        }
-      };
-      imgArray.push(img);
+      img.onload = onLoad;
+      imgArray[i - 1] = img;
     }
+
     setImages(imgArray);
   }, []);
 
   // Update canvas on scroll
   useEffect(() => {
-    if (loading || images.length === 0) return;
+    // Only block if we don't even have the first image
+    if (images.length === 0 || !images[0].complete) return;
 
     const canvas = canvasRef.current;
+    if (!canvas) return;
+
     const context = canvas.getContext('2d');
 
     // Set canvas dimensions
@@ -49,8 +67,28 @@ const Hero = () => {
     canvas.height = window.innerHeight;
 
     const render = (index) => {
-      if (index >= 0 && index < frameCount) {
-        const img = images[index];
+      // Fallback: If frame not loaded yet, try to find closest loaded frame
+      let img = images[index];
+      if (!img || !img.complete) {
+        // Find closest previous loaded frame
+        for (let i = index - 1; i >= 0; i--) {
+          if (images[i] && images[i].complete) {
+            img = images[i];
+            break;
+          }
+        }
+        // If no previous, try next (rare case if random loading)
+        if (!img || !img.complete) {
+          for (let i = index + 1; i < frameCount; i++) {
+            if (images[i] && images[i].complete) {
+              img = images[i];
+              break;
+            }
+          }
+        }
+      }
+
+      if (img && img.complete) {
         // "Cover" fit logic for canvas
         const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
         const x = (canvas.width / 2) - (img.width / 2) * scale;
@@ -124,24 +162,24 @@ const Hero = () => {
     window.addEventListener('scroll', handleScroll);
     window.addEventListener('resize', () => render(0)); // Re-render on resize
 
-    // Initial render
+    // Initial render attempt (will try 0, or first loaded)
     render(0);
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', () => render(0));
     };
-  }, [loading, images]);
+  }, [images]); // Re-bind when images array updates (though mutations might not trigger, state setImages does)
 
   return (
     <div ref={containerRef} style={{ height: '500vh', position: 'relative', backgroundColor: '#000' }}>
       <div className="sticky-wrapper">
         <canvas ref={canvasRef} id="hero-canvas" />
 
-        {/* Loading State */}
-        {loading && (
-          <div className="loader">
-            <h1>Loading Experience...</h1>
+        {/* Loading Indicator (Small, non-blocking) */}
+        {!isLoaded && (
+          <div className="loader-small">
+            <span>Loading Experience... {loadingProgress}%</span>
           </div>
         )}
 
@@ -203,14 +241,17 @@ const Hero = () => {
             background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.8));
             pointer-events: none;
         }
-        .loader {
+        .loader-small {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: var(--color-primary);
-            font-family: var(--font-heading);
+            top: 20px;
+            right: 20px;
+            color: rgba(255, 255, 255, 0.5);
+            font-family: var(--font-body);
+            font-size: 0.8rem;
             z-index: 20;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 10px;
+            border-radius: 4px;
         }
         .hero-text {
             position: absolute;
