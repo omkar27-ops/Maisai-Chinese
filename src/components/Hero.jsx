@@ -5,8 +5,7 @@ const Hero = () => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [images, setImages] = useState([]);
-  const [loadingProgress, setLoadingProgress] = useState(0);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Configuration
   const frameCount = 192;
@@ -14,52 +13,46 @@ const Hero = () => {
 
   // Pad numbers with leading zeros (e.g., 1 -> 00001)
   const currentFrame = (index) => (
-    `${imagesPath}/${index.toString().padStart(5, '0')}.jpg`
+    `${imagesPath}/${index.toString().padStart(5, '0')}.jpg` // Adjusted to .jpg and 5 digits padding to match script output if it preserved names
   );
+  // Wait, let's double check the script. 
+  // Script says: const outputFilename = file.replace(/\.[^.]+$/, '.jpg');
+  // Input files were 00001.png etc (5 digits). So output will be 00001.jpg (5 digits).
+  // My previous code used 00${index.toString().padStart(3, '0')} which results in 00001.
+  // Actually padStart(5, '0') is safer if index is 1 -> 00001.
 
-  // Preload images with progressive loading
+  // Preload images
   useEffect(() => {
     let loadedCount = 0;
     const imgArray = [];
-    const frameStride = 4; // Aggressive optimization: Load every 4th frame
-    const effectiveTotal = Math.ceil(frameCount / frameStride);
 
-    // Function to handle load
-    const onLoad = () => {
-      loadedCount++;
-      setLoadingProgress(Math.round((loadedCount / effectiveTotal) * 100));
-      if (loadedCount >= effectiveTotal) {
-        setIsLoaded(true);
-      }
-    };
-
-    // 1. Load the first frame immediately
-    const firstImg = new Image();
-    firstImg.src = currentFrame(1);
-    firstImg.onload = () => {
-      onLoad();
-    };
-    imgArray[0] = firstImg;
-
-    // 2. Load the rest in background with stride
-    for (let i = 1 + frameStride; i <= frameCount; i += frameStride) {
+    // We'll load all frames. For 192 frames, this might take a moment.
+    // In a real prod app, you might lazily load or use a sprite sheet/video.
+    for (let i = 1; i <= frameCount; i++) {
       const img = new Image();
       img.src = currentFrame(i);
-      img.onload = onLoad;
-      imgArray[i - 1] = img;
+      img.onload = () => {
+        loadedCount++;
+        if (loadedCount === frameCount) {
+          setLoading(false);
+        }
+      };
+      img.onerror = () => {
+        console.error(`Failed to load image: ${currentFrame(i)}`);
+        // Continue loading to avoid stuck state, or handle error
+        loadedCount++;
+        if (loadedCount === frameCount) setLoading(false);
+      };
+      imgArray.push(img);
     }
-
     setImages(imgArray);
   }, []);
 
   // Update canvas on scroll
   useEffect(() => {
-    // Only block if we don't even have the first image
-    if (images.length === 0 || !images[0].complete) return;
+    if (loading || images.length === 0) return;
 
     const canvas = canvasRef.current;
-    if (!canvas) return;
-
     const context = canvas.getContext('2d');
 
     // Set canvas dimensions
@@ -67,28 +60,10 @@ const Hero = () => {
     canvas.height = window.innerHeight;
 
     const render = (index) => {
-      // Fallback: If frame not loaded yet, try to find closest loaded frame
-      let img = images[index];
-      if (!img || !img.complete) {
-        // Find closest previous loaded frame
-        for (let i = index - 1; i >= 0; i--) {
-          if (images[i] && images[i].complete) {
-            img = images[i];
-            break;
-          }
-        }
-        // If no previous, try next (rare case if random loading)
-        if (!img || !img.complete) {
-          for (let i = index + 1; i < frameCount; i++) {
-            if (images[i] && images[i].complete) {
-              img = images[i];
-              break;
-            }
-          }
-        }
-      }
+      if (index >= 0 && index < frameCount) {
+        const img = images[index];
+        if (!img) return; // Safety check
 
-      if (img && img.complete) {
         // "Cover" fit logic for canvas
         const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
         const x = (canvas.width / 2) - (img.width / 2) * scale;
@@ -162,24 +137,24 @@ const Hero = () => {
     window.addEventListener('scroll', handleScroll);
     window.addEventListener('resize', () => render(0)); // Re-render on resize
 
-    // Initial render attempt (will try 0, or first loaded)
+    // Initial render
     render(0);
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', () => render(0));
     };
-  }, [images]); // Re-bind when images array updates (though mutations might not trigger, state setImages does)
+  }, [loading, images]);
 
   return (
     <div ref={containerRef} style={{ height: '500vh', position: 'relative', backgroundColor: '#000' }}>
       <div className="sticky-wrapper">
         <canvas ref={canvasRef} id="hero-canvas" />
 
-        {/* Loading Indicator (Small, non-blocking) */}
-        {!isLoaded && (
-          <div className="loader-small">
-            <span>Loading Experience... {loadingProgress}%</span>
+        {/* Loading State */}
+        {loading && (
+          <div className="loader">
+            <h1>Loading Experience...</h1>
           </div>
         )}
 
@@ -231,24 +206,6 @@ const Hero = () => {
           width: 100%;
           height: 100%;
           object-fit: cover;
-          opacity: 0;
-          transition: opacity 0.5s ease-in;
-        }
-        #hero-canvas.visible {
-            opacity: 1;
-        }
-        .static-hero {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            z-index: 1;
-        }
-        .static-hero.hidden {
-            opacity: 0;
-            transition: opacity 0.5s ease-out;
         }
         .hero-overlay-gradient {
             position: absolute;
@@ -259,17 +216,14 @@ const Hero = () => {
             background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.8));
             pointer-events: none;
         }
-        .loader-small {
+        .loader {
             position: absolute;
-            top: 20px;
-            right: 20px;
-            color: rgba(255, 255, 255, 0.5);
-            font-family: var(--font-body);
-            font-size: 0.8rem;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--color-primary);
+            font-family: var(--font-heading);
             z-index: 20;
-            background: rgba(0,0,0,0.5);
-            padding: 5px 10px;
-            border-radius: 4px;
         }
         .hero-text {
             position: absolute;
