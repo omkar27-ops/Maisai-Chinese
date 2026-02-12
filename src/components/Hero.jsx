@@ -231,6 +231,24 @@ const Hero = () => {
           width: 100%;
           height: 100%;
           object-fit: cover;
+          opacity: 0;
+          transition: opacity 0.5s ease-in;
+        }
+        #hero-canvas.visible {
+            opacity: 1;
+        }
+        .static-hero {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+        }
+        .static-hero.hidden {
+            opacity: 0;
+            transition: opacity 0.5s ease-out;
         }
         .hero-overlay-gradient {
             position: absolute;
