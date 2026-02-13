@@ -9,7 +9,7 @@ const Hero = () => {
 
   // Configuration
   const frameCount = 232;
-  const imagesPath = '/Toss-Optimized'; // Updated path
+  const imagesPath = '/Toss-jpg'; // Revert to original images
 
   // Format: ezgif-frame-XXX.jpg
   const currentFrame = (index) => (
