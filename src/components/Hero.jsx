@@ -9,11 +9,11 @@ const Hero = () => {
 
   // Configuration
   const frameCount = 232;
-  const imagesPath = '/Toss-jpg'; // Revert to original images
+  const imagesPath = '/Toss-WebP'; // WebP images
 
-  // Format: ezgif-frame-XXX.jpg
+  // Format: ezgif-frame-XXX.webp
   const currentFrame = (index) => (
-    `${imagesPath}/ezgif-frame-${index.toString().padStart(3, '0')}.jpg`
+    `${imagesPath}/ezgif-frame-${index.toString().padStart(3, '0')}.webp`
   );
 
 
