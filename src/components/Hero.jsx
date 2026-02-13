@@ -8,18 +8,14 @@ const Hero = () => {
   const [loading, setLoading] = useState(true);
 
   // Configuration
-  const frameCount = 192;
-  const imagesPath = '/Noodle Toss Optimized'; // Use optimized images
+  const frameCount = 232;
+  const imagesPath = '/Toss-jpg'; // New image folder
 
-  // Pad numbers with leading zeros (e.g., 1 -> 00001)
+  // Format: ezgif-frame-XXX.jpg
   const currentFrame = (index) => (
-    `${imagesPath}/${index.toString().padStart(5, '0')}.jpg` // Adjusted to .jpg and 5 digits padding to match script output if it preserved names
+    `${imagesPath}/ezgif-frame-${index.toString().padStart(3, '0')}.jpg`
   );
-  // Wait, let's double check the script. 
-  // Script says: const outputFilename = file.replace(/\.[^.]+$/, '.jpg');
-  // Input files were 00001.png etc (5 digits). So output will be 00001.jpg (5 digits).
-  // My previous code used 00${index.toString().padStart(3, '0')} which results in 00001.
-  // Actually padStart(5, '0') is safer if index is 1 -> 00001.
+
 
   // Preload images
   useEffect(() => {
