@@ -7,8 +7,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const inputDir = path.join(__dirname, '../public/Noodle Toss');
-const outputDir = path.join(__dirname, '../public/Noodle Toss Optimized');
+const inputDir = path.join(__dirname, '../public/Toss-jpg');
+const outputDir = path.join(__dirname, '../public/Toss-Optimized');
 
 if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });

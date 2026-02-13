@@ -4,12 +4,12 @@ import React, { useEffect, useRef, useState } from 'react';
 const Hero = () => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
-  const [images, setImages] = useState([]);
+  const imagesRef = useRef([]); // Use ref for images to avoid re-renders
   const [loading, setLoading] = useState(true);
 
   // Configuration
   const frameCount = 232;
-  const imagesPath = '/Toss-jpg'; // New image folder
+  const imagesPath = '/Toss-Optimized'; // Updated path
 
   // Format: ezgif-frame-XXX.jpg
   const currentFrame = (index) => (
@@ -17,38 +17,69 @@ const Hero = () => {
   );
 
 
-  // Preload images
+  // Preload images with progressive loading
   useEffect(() => {
-    let loadedCount = 0;
-    const imgArray = [];
+    // Initialize ref array
+    imagesRef.current = new Array(frameCount).fill(null);
 
-    // We'll load all frames. For 192 frames, this might take a moment.
-    // In a real prod app, you might lazily load or use a sprite sheet/video.
-    for (let i = 1; i <= frameCount; i++) {
-      const img = new Image();
-      img.src = currentFrame(i);
-      img.onload = () => {
-        loadedCount++;
-        if (loadedCount === frameCount) {
-          setLoading(false);
+    const loadFrame = (index) => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.src = currentFrame(index);
+        img.onload = () => {
+          imagesRef.current[index - 1] = img; // Store in ref (0-indexed)
+          resolve();
+        };
+        img.onerror = () => {
+          console.warn(`Failed to load frame ${index}`);
+          resolve(); // Resolve to adhere to Promise.all
+        };
+      });
+    };
+
+    const loadImages = async () => {
+      // Priority: Load first 30 frames for immediate playback
+      const priorityCount = 30;
+      const priorityPromises = [];
+      for (let i = 1; i <= priorityCount; i++) {
+        priorityPromises.push(loadFrame(i));
+      }
+
+      await Promise.all(priorityPromises);
+      setLoading(false); // Enable interaction as soon as intro is ready
+
+      // Background: Load the rest in chunks
+      const chunkSize = 20;
+      for (let i = priorityCount + 1; i <= frameCount; i += chunkSize) {
+        const chunkPromises = [];
+        // Create a chunk of promises
+        for (let j = i; j < i + chunkSize && j <= frameCount; j++) {
+          chunkPromises.push(loadFrame(j));
         }
-      };
-      img.onerror = () => {
-        console.error(`Failed to load image: ${currentFrame(i)}`);
-        // Continue loading to avoid stuck state, or handle error
-        loadedCount++;
-        if (loadedCount === frameCount) setLoading(false);
-      };
-      imgArray.push(img);
-    }
-    setImages(imgArray);
+        // Wait for chunk to load before starting next chunk (gentle on network)
+        await Promise.all(chunkPromises);
+      }
+    };
+
+    loadImages();
+
+    // Cleanup not strictly necessary for simple image loading, but good practice
+    return () => {
+      imagesRef.current = [];
+    };
+
   }, []);
 
   // Update canvas on scroll
+  // Update canvas on scroll
   useEffect(() => {
-    if (loading || images.length === 0) return;
+    // Only wait for loading to complete (priority batch). 
+    // imagesRef will be populated incrementally, but that's fine.
+    if (loading) return;
 
     const canvas = canvasRef.current;
+    if (!canvas) return;
+
     const context = canvas.getContext('2d');
 
     // Set canvas dimensions
@@ -57,7 +88,7 @@ const Hero = () => {
 
     const render = (index) => {
       if (index >= 0 && index < frameCount) {
-        const img = images[index];
+        const img = imagesRef.current[index]; // Use ref
         if (!img) return; // Safety check
 
         // "Cover" fit logic for canvas
@@ -100,33 +131,41 @@ const Hero = () => {
 
       // Text 1: Visible 0-30%
       if (scrollFraction < 0.3) {
-        text1.style.opacity = 1 - (scrollFraction / 0.3);
-        text1.style.transform = `translate(-50%, -50%) scale(${1 + scrollFraction})`;
+        if (text1) {
+          text1.style.opacity = 1 - (scrollFraction / 0.3);
+          text1.style.transform = `translate(-50%, -50%) scale(${1 + scrollFraction})`;
+        }
       } else {
-        text1.style.opacity = 0;
+        if (text1) text1.style.opacity = 0;
       }
 
       // Text 2: Visible 40-70%
       if (scrollFraction > 0.4 && scrollFraction < 0.7) {
-        // Fade in 0.4-0.5, Fade out 0.6-0.7
-        if (scrollFraction < 0.5) {
-          text2.style.opacity = (scrollFraction - 0.4) * 10;
-        } else if (scrollFraction > 0.6) {
-          text2.style.opacity = 1 - (scrollFraction - 0.6) * 10;
-        } else {
-          text2.style.opacity = 1;
+        if (text2) {
+          // Fade in 0.4-0.5, Fade out 0.6-0.7
+          if (scrollFraction < 0.5) {
+            text2.style.opacity = (scrollFraction - 0.4) * 10;
+          } else if (scrollFraction > 0.6) {
+            text2.style.opacity = 1 - (scrollFraction - 0.6) * 10;
+          } else {
+            text2.style.opacity = 1;
+          }
         }
       } else {
-        text2.style.opacity = 0;
+        if (text2) text2.style.opacity = 0;
       }
 
       // Text 3: Visible 80-100%
       if (scrollFraction > 0.8) {
-        text3.style.opacity = (scrollFraction - 0.8) * 5;
-        text3.style.pointerEvents = 'auto'; // Enable buttons
+        if (text3) {
+          text3.style.opacity = (scrollFraction - 0.8) * 5;
+          text3.style.pointerEvents = 'auto'; // Enable buttons
+        }
       } else {
-        text3.style.opacity = 0;
-        text3.style.pointerEvents = 'none'; // Disable buttons when not visible
+        if (text3) {
+          text3.style.opacity = 0;
+          text3.style.pointerEvents = 'none'; // Disable buttons when not visible
+        }
       }
     };
 
@@ -140,7 +179,7 @@ const Hero = () => {
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', () => render(0));
     };
-  }, [loading, images]);
+  }, [loading]); // Only re-run when loading completes
 
   return (
     <div ref={containerRef} style={{ height: '500vh', position: 'relative', backgroundColor: '#000' }}>
